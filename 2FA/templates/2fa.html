@@ -21,7 +21,7 @@
     </div>
 </div>
 
-<script nonce="{{ csp_nonce }}">
+<script {% if csp_nonce %}nonce="{{ csp_nonce }}"{%endif%}>
 const form = document.getElementById('otp-form');
 const resendBtn = document.getElementById('resend-btn');
 const alertBox = document.getElementById('alert');

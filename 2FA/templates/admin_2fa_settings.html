@@ -17,7 +17,7 @@
         </div>
     </div>
 </div>
-<script nonce="{{ csp_nonce }}">
+<script {% if csp_nonce %}nonce="{{ csp_nonce }}"{%endif%}>
     document.getElementById('2fa_enabled').addEventListener('change', async function () {
         const enabled = this.checked;
         if (confirm("Are you sure you want to change this setting?")){
