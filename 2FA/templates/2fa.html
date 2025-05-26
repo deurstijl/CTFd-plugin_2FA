@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="bg-light p-4 mb-4 rounded">
+    <div class="container">
+        <h1 class="text-center">Email Verification</h1>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <p>A 6-digit code has been sent to your email. Please enter it below.</p>
+            <div id="alert" class="alert d-none" role="alert"></div>
+            <form id="otp-form" class="mb-3">
+                <input type="text" name="otp" placeholder="Enter your code" required class="form-control mb-2">
+                <input type="hidden" name="nonce" value="{{ Session.nonce }}">
+                <button type="submit" class="btn btn-primary w-100">Verify</button>
+            </form>
+            <button id="resend-btn" class="btn btn-secondary w-100" disabled>Resend Code (60s)</button>
+        </div>
+    </div>
+</div>
+
+<script nonce="{{ csp_nonce }}">
+const form = document.getElementById('otp-form');
+const resendBtn = document.getElementById('resend-btn');
+const alertBox = document.getElementById('alert');
+
+let resendCountdown = 60;
+let resendAttempts = 0;
+const maxResends = 3;
+
+const cooldownDuration = 60; // seconds
+const lastSent = {{ last_sent | default(0) }} * 1000;  // convert to ms
+const now = Date.now();
+let timeSinceLastSent = Math.floor((now - lastSent) / 1000);
+let countdown = Math.max(0, cooldownDuration - timeSinceLastSent);
+
+if (countdown > 0) {
+    startResendCooldown(countdown);
+} else {
+    resendBtn.disabled = false;
+    resendBtn.textContent = "Resend Code";
+}
+
+form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const formData = new FormData(form);
+
+    try {
+        const response = await fetch('{{ url_for("email_2fa.otp_verify") }}', {
+            method: 'POST',
+            body: formData,
+            headers: { 'Accept': 'application/json' }
+        });
+
+        if (response.status === 403) {
+            // User likely logged out or session expired
+            window.location.href = '{{ url_for("auth.login") }}';
+            return;
+        }
+
+        const result = await response.json();
+        if (result.success) {
+            window.location.href = result.redirect;
+        } else {
+            showAlert(result.error || 'Verification failed.');
+        }
+    } catch (error) {
+        window.location.href = '{{ url_for("auth.login") }}';
+    }
+});
+
+resendBtn.addEventListener('click', async () => {
+    if (resendAttempts >= maxResends) {
+        showAlert("You have reached the maximum number of resend attempts.");
+        resendBtn.disabled = true;
+        return;
+    }
+
+    try {
+        const formData = new FormData();
+        const CTFd = window.CTFd;
+        const csrfNonce = CTFd?.config?.csrfNonce || "";
+        formData.append("nonce", csrfNonce);
+        const response = await fetch('{{ url_for("email_2fa.resend_otp") }}', {
+            method: 'POST',
+            body: formData,
+            headers: { 'Accept': 'application/json' }
+        });
+
+        const result = await response.json();
+        if (result.success) {
+            showAlert("A new 2FA code was generated and sent to your email address.");
+            resendAttempts++;
+            startResendCooldown(60);
+        } else {
+            showAlert(result.error);
+        }
+    } catch (error) {
+        showAlert('Could not resend the code.');
+    }
+});
+
+function startResendCooldown(seconds) {
+    resendBtn.disabled = true;
+    resendBtn.textContent = `Resend Code (${seconds}s)`;
+
+    const interval = setInterval(() => {
+        seconds--;
+        resendBtn.textContent = `Resend Code (${seconds}s)`;
+        if (seconds <= 0) {
+            clearInterval(interval);
+            if (resendAttempts < maxResends) {
+                resendBtn.disabled = false;
+                resendBtn.textContent = "Resend Code";
+            }
+        }
+    }, 1000);
+}
+
+function updateResendButtonText() {
+    resendBtn.textContent = `Resend Code (${resendCountdown}s)`;
+}
+
+function showAlert(message) {
+    alertBox.textContent = message;
+    alertBox.className = 'alert alert-danger';
+    alertBox.classList.remove('d-none');
+}
+
+</script>
+{% endblock %}

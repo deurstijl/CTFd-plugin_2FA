@@ -1,0 +1,6 @@
+[
+	{
+	    "name": "2 Factor Authentication",
+	    "route": "/admin/2fa"
+	}
+]

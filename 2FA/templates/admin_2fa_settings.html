@@ -1,0 +1,61 @@
+{% extends "admin/base.html" %}
+{% block content %}
+<div class="bg-light p-4 mb-4 rounded">
+    <div class="container">
+        <h1 class="text-center">2 Factor Authentication</h1>
+    </div>
+</div>
+
+<div class="container">
+    <div class="row">
+        <div class="col-md-6 offset-md-5">
+            <div class="form-check">
+                <input type="checkbox" class="form-check-input" id="2fa_enabled" {% if enabled %} checked {% endif %}>
+                <label class="form-check-label" for="2fa_enabled">Enable 2FA enforcement</label>
+            </div>
+            <div id="2fa-status-msg" class="mt-2 text-muted"></div>
+        </div>
+    </div>
+</div>
+<script nonce="{{ csp_nonce }}">
+    document.getElementById('2fa_enabled').addEventListener('change', async function () {
+        const enabled = this.checked;
+        if (confirm("Are you sure you want to change this setting?")){
+            try {
+                const CTFd = window.CTFd;
+                const csrfNonce = CTFd?.config?.csrfNonce || "";
+                const response = await fetch('{{ url_for("email_2fa.admin_2fa_settings") }}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        "CSRF-Token": csrfNonce
+                    },
+                    body: JSON.stringify({ enabled: enabled})
+                });
+        
+                const result = await response.json();
+                if (result.success) {
+                    showStatus("2FA setting updated.", "green");
+                } else {
+                    showStatus("Failed to update setting.", "red");
+                }
+            } catch (err) {
+                showStatus("Error communicating with server.", "red");
+            }
+        } else {
+            if (this.checked){
+                this.checked=false;
+            } else {
+                this.checked=true;
+            }
+        }
+    });
+    
+    function showStatus(msg, color) {
+        const status = document.getElementById('2fa-status-msg');
+        status.textContent = msg;
+        status.style.color = color;
+    }
+</script>
+{% endblock %}
