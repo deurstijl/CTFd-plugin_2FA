@@ -20,6 +20,8 @@ OTP_EXPIRY = 300  # 5 minutes
 # also check if a mail has been sent, we can send a mail every minute. so add a last time mailed, and do a check if we are within the minute.
 # Check the initial registration.
 
+default_2FA_text="Your CTFd 2 Factor Authentication code is: OTP_TOKEN\nPlease enter this on the CTFd website.\n\nIf you have not tried to login to the CTF, you account could be compromised and a password change is required to keep your account safe."
+
 def generate_otp():
     return str(random.randint(100000, 999999))
 
@@ -36,10 +38,12 @@ def send_otp_email(user):
     store_otp(user.id, otp)
     session['otp_last_sent'] = now
 
+    message=get_config('email_2fa_message') or default_2FA_text
+
     sendmail(
         addr=user.email,
         subject="Your CTFd 2FA Code",
-        text=f"Your CTFd 2 Factor Authentication code is: {otp}\nPlease enter this on the CTFd website.\n\nIf you have not tried to login to the CTF, you account could be compromised and a password change is required too keep your account safe."
+        text=message.replace("OTP_TOKEN", otp)
     )
 
 def store_otp(user_id, otp):
@@ -85,7 +89,7 @@ def define_backend_routes(app):
         
         exempt_endpoints = [
             "auth.login", "auth.logout", "auth.confirm", "email_2fa.otp_prompt", "email_2fa.otp_verify",
-            "views.static", "views.themes", "views.files", "api.configs_config_list",
+            "views.static", "views.themes", "views.files", "views.static_html", "api.configs_config_list",
             "events.subscribe", "email_2fa.resend_otp"  
             # Allow static files and prevent multiple redirects
         ]
@@ -156,15 +160,29 @@ def define_backend_routes(app):
         if request.method == 'POST':
             if request.is_json:
                 data = request.get_json()
-                enabled = data.get('enabled', False)
-                set_config('email_2fa_enabled', str(enabled))
-                return {"success": True, "enabled": enabled}
+                response = {"success": True}
+
+                # Handle the enabled checkbox
+                if "enabled" in data:
+                    enabled = data.get('enabled', False)
+                    set_config('email_2fa_enabled', str(enabled))
+                    response['enabled'] = enabled
+
+                # Handle the 2FA message textarea
+                if "message" in data:
+                    message = data.get('message', '')
+                    set_config('email_2fa_message', message)
+                    response['message'] = message
+
+                return response
             else:
-                # Optional: handle non-AJAX fallback, or just reject
                 return {"success": False, "error": "Invalid request format."}, 400
 
+        # GET: render page with current settings
         enabled = get_config('email_2fa_enabled')
-        return render_template('admin_2fa_settings.html', enabled=enabled)
+        message = get_config('email_2fa_message') or default_2FA_text
+        print("message",message)
+        return render_template('admin_2fa_settings.html', enabled=enabled, TWOFA_message=message)
 
     app.register_blueprint(bp)
     

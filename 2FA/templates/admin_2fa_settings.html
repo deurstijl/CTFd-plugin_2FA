@@ -13,11 +13,16 @@
                 <input type="checkbox" class="form-check-input" id="2fa_enabled" {% if enabled %} checked {% endif %}>
                 <label class="form-check-label" for="2fa_enabled">Enable 2FA enforcement</label>
             </div>
+            <br>
+            <h6><strong>2 factor authentication mail content:</strong></h6>
+            <small>The string <b>OTP_TOKEN</b> will be replaced with the actual token.</small><br>
+            <textarea class="form-control" type="text" id="2FA_message" rows="5" >{{ TWOFA_message }}</textarea>
+            <button id="update-2fa-message" class="btn btn-primary mt-3">Update 2FA Message</button>
             <div id="2fa-status-msg" class="mt-2 text-muted"></div>
         </div>
     </div>
 </div>
-<script {% if csp_nonce %}nonce="{{ csp_nonce }}"{%endif%}>
+<script {% if csp_nonce %}nonce="{{ csp_nonce }}" {% endif %}>
     document.getElementById('2fa_enabled').addEventListener('change', async function () {
         const enabled = this.checked;
         if (confirm("Are you sure you want to change this setting?")){
@@ -49,6 +54,32 @@
             } else {
                 this.checked=true;
             }
+        }
+    });
+
+    document.getElementById('update-2fa-message').addEventListener('click', async function () {
+        const message = document.getElementById('2FA_message').value;
+        try {
+            const CTFd = window.CTFd;
+            const csrfNonce = CTFd?.config?.csrfNonce || "";
+            const response = await fetch('{{ url_for("email_2fa.admin_2fa_settings") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    "CSRF-Token": csrfNonce
+                },
+                body: JSON.stringify({ message: message })
+            });
+
+            const result = await response.json();
+            if (result.success) {
+                showStatus("2FA message updated.", "green");
+            } else {
+                showStatus("Failed to update message.", "red");
+            }
+        } catch (err) {
+            showStatus("Error communicating with server.", "red");
         }
     });
     
