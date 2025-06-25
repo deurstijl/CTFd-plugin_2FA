@@ -95,6 +95,10 @@ def define_backend_routes(app):
         ]
         if request.endpoint in exempt_endpoints:
             return
+        
+        if request.endpoint == "views.settings" and request.referrer.endswith("confirm"):
+            # Dont do 2FA when a user tries to change the email address at registration.
+            return
 
         # if request.endpoint and request.endpoint.startswith("admin"):
         #     return  # Optional: don't block admin panel
