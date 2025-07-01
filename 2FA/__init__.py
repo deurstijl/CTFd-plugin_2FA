@@ -100,6 +100,10 @@ def define_backend_routes(app):
             # allow the plugin assets, these could be injected in pages.
             return
         
+        if request.path.startswith("/files/"):
+            # Allow all /files/ assets
+            return
+        
         user=get_current_user()
         
         if user and not user.verified:
