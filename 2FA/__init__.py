@@ -96,6 +96,10 @@ def define_backend_routes(app):
         if request.endpoint in exempt_endpoints:
             return
         
+        if request.endpoint.startswith("plugins.") and "assets" in request.endpoint:
+            # allow the plugin assets, these could be injected in pages.
+            return
+        
         user=get_current_user()
         
         if user and not user.verified:
